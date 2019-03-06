@@ -45,8 +45,8 @@ def receive(sock, n):
 if __name__ == '__main__':
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect(("localhost", 8080))
-    for i in range(10):
-        out, result = rpc(s, "ping", "reader %d" % i)
+    for i in range(4):
+        out, result = rpc(s, "fib", i)
         print(out, result)
         time.sleep(1)
     s.close()

@@ -46,7 +46,7 @@ if __name__ == '__main__':
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect(("localhost", 8080))
     for i in range(4):
-        out, result = rpc(s, "fib", i)
+        out, result = rpc(s, "ping", i)
         print(out, result)
         time.sleep(1)
     s.close()

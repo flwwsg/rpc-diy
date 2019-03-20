@@ -4,8 +4,10 @@ import socket
 import json
 import struct
 from kazoo.client import KazooClient
+from etcd import Client
 
 zk_root = "/demo"
+zk_rpc = zk_root+'/rpc'
 # 全局变量，RemoteServer 对象列表
 G = {"servers": None}
 
@@ -96,9 +98,48 @@ def get_servers():
     return G["servers"]
 
 
+def get_servers_with_etcd():
+    client = Client(port=2379)
+    # 获取新的服务地址，并监听服务变动
+
+    def get_all_addr():
+        new_addrs = set()
+        rpc_dir = client.get(zk_rpc)
+        for child in rpc_dir.leaves:
+            addr = json.loads(child.value)
+            new_addrs.add("%s:%d" % (addr["host"], addr["port"]))
+        return new_addrs
+    # 当前活跃地址
+    current_addrs = get_all_addr()
+    G["servers"] = [RemoteServer(s) for s in current_addrs]
+    for _ in client.eternal_watch(zk_rpc, recursive=True):
+        print("listening etcd")
+        new_addrs = get_all_addr()
+        # 新增
+        add_addrs = new_addrs - current_addrs
+        # 需要删除
+        del_addrs = current_addrs - new_addrs
+        del_servers = []
+        for addr in del_addrs:
+            for s in G["servers"]:
+                if s.addr == addr:
+                    del_servers.append(s)
+                    break
+        for server in del_servers:
+            G["servers"].remove(server)
+            current_addrs.remove(server.addr)
+        # 新增
+        for addr in add_addrs:
+            G["servers"].append(RemoteServer(addr))
+            current_addrs.add(addr)
+        print("last g[servers]", G["servers"])
+    return G["servers"]
+
+
 def random_server():
     if G["servers"] is None:
-        get_servers()
+        # get_servers()
+        get_servers_with_etcd()
     if not G["servers"]:
         return
     return random.choice(G["servers"])

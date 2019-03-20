@@ -9,6 +9,7 @@ import socket
 import struct
 import os
 from kazoo.client import KazooClient
+from etcd import Client
 
 
 class RPCHandler(asyncore.dispatcher_with_send):
@@ -87,7 +88,7 @@ class RPCHandler(asyncore.dispatcher_with_send):
 
 class RPCServer(asyncore.dispatcher):
     zk_root = "/demo"
-    zk_rp = zk_root+"/rpc"
+    zk_rpc = zk_root + "/rpc"
 
     def __init__(self, port):
         asyncore.dispatcher.__init__(self)
@@ -97,8 +98,11 @@ class RPCServer(asyncore.dispatcher):
         self.listen(1)
         self.child_pids = None
         self.zk = KazooClient()
+        self.etcd = Client(port=2379)
+        self.port = port
         if self.prefork(10):
-            self.register_zk(port)
+            # self.register_zk(port)
+            self.register_etcd()
             self.register_parent_signal()
         else:
             # in child process, pid = 0
@@ -133,8 +137,16 @@ class RPCServer(asyncore.dispatcher):
         for c in child:
             print(self.zk.get(self.zk_root+"/"+c)[0])
 
+    def register_etcd(self):
+        value = json.dumps({"host": "127.0.0.1", "port": self.port})
+        res = self.etcd.write(self.zk_rpc + "/localhost:%s" % self.port, value)
+        directory = self.etcd.get(self.zk_rpc)
+        for d in directory.leaves:
+            print(d.key, ":", d.value)
+
     def exit_parent(self, sig, frame):
-        self.zk.stop()
+        # self.zk.stop()
+        self.etcd.delete(self.zk_rpc + "/localhost:%s" % self.port)
         self.close()
         asyncore.close_all()
         pids = []

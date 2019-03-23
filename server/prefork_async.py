@@ -21,10 +21,10 @@ class RPCHandler(asyncore.dispatcher_with_send):
         print(self.addr, "comes")
 
     def handle_close(self):
-        # 有读事件时的回调方法
         print(self.addr, "close")
         self.close()
 
+    # 有读事件时的回调方法
     def handle_read(self):
         while True:
             content = self.recv(1024)
